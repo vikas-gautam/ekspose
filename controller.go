@@ -7,6 +7,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -78,6 +79,26 @@ func (c *controller) processItem() bool {
 		return false
 	}
 	fmt.Printf("printing ns and name out of key %s, %s\n", ns, name)
+
+	//check if the object has been deleted from k8s cluster
+	ctx := context.Background()
+	_, err = c.clientSet.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		fmt.Printf("handle delete event for deployment %s \n", name)
+
+		err = c.clientSet.CoreV1().Services(ns).Delete(ctx, name, metav1.DeleteOptions{})
+		if err != nil {
+			fmt.Printf("Error in deleting service %s\n", err.Error())
+		}
+		fmt.Printf("Deleted service %s\n", name)
+
+		err = c.clientSet.NetworkingV1().Ingresses(ns).Delete(ctx, name, metav1.DeleteOptions{})
+		if err != nil {
+			fmt.Printf("Error in deleting ingress %s\n", err.Error())
+		}
+		fmt.Printf("Deleted ingress %s\n", name)
+		return true
+	}
 
 	err = c.syncDeployment(ns, name)
 	if err != nil {
