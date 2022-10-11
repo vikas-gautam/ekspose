@@ -66,6 +66,7 @@ func (c *controller) processItem() bool {
 	if shutdown {
 		return false
 	}
+	defer c.queue.Forget(item)
 	key, err := cache.MetaNamespaceKeyFunc(item)
 	if err != nil {
 		fmt.Printf("getting key from cache %s\n", err.Error())
